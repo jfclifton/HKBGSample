@@ -167,8 +167,9 @@
                                                           
                                                           // Check to see if the retreived weight from Health app is the same as our stored weight
                                                           if (weight != storedWeight.integerValue) {
-                                                              // We want to send the POST request with the new data
+                                                              // We want to send the POST request with the new data and store the new weight
                                                               NSLog(@"Sending weight data");
+                                                              [[NSUserDefaults standardUserDefaults] setObject:[NSNumber numberWithInteger:weight] forKey:@"userWeight"];
                                                               UILocalNotification *notification=[UILocalNotification new];
                                                               notification.fireDate=[NSDate dateWithTimeIntervalSinceNow:5];
                                                               notification.alertBody=[NSString stringWithFormat:@"Received new weight %ld",weight];
