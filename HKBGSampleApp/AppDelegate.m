@@ -160,10 +160,6 @@
                                                           
                                                           // Get the storedWeight - if it doesn't exist, create it
                                                           NSNumber *storedWeight = [[NSUserDefaults standardUserDefaults] objectForKey:@"userWeight"];
-                                                          if (!storedWeight) {
-                                                              [[NSUserDefaults standardUserDefaults] setObject:[NSNumber numberWithInteger:weight] forKey:@"userWeight"];
-                                                          }
-                                                          
                                                           
                                                           // Check to see if the retreived weight from Health app is the same as our stored weight
                                                           if (weight != storedWeight.integerValue) {
