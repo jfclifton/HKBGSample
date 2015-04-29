@@ -12,6 +12,8 @@
 @interface AppDelegate ()
 
 @property (nonatomic, strong) HKHealthStore *healthKitStore;
+@property (nonatomic, assign) BOOL anchorSet;
+@property (nonatomic, assign) NSUInteger anchor;
 
 @end
 
@@ -90,16 +92,12 @@
     [self.healthKitStore enableBackgroundDeliveryForType: [HKQuantityType quantityTypeForIdentifier: HKQuantityTypeIdentifierBodyMass] frequency:HKUpdateFrequencyImmediate withCompletion:^(BOOL success, NSError *error) {
         NSLog(@"Observation registered error=%@",error);
     }];
-    
-    [self.healthKitStore enableBackgroundDeliveryForType: [HKQuantityType quantityTypeForIdentifier:HKQuantityTypeIdentifierHeight] frequency:HKUpdateFrequencyImmediate withCompletion:^(BOOL success, NSError *error) {
-        NSLog(@"Observation registered error=%@",error);
-    }];
 }
 
 
 -(void) observeQuantityType{
     
-    // Weight
+    // Weight Observer Query
     HKSampleType *quantityType = [HKSampleType quantityTypeForIdentifier:HKQuantityTypeIdentifierBodyMass];
     
     HKObserverQuery *query =
@@ -116,98 +114,62 @@
          
      }];
     [self.healthKitStore executeQuery:query];
-    
-    // Height
-    HKSampleType *charType = [HKSampleType quantityTypeForIdentifier:HKQuantityTypeIdentifierHeight];
-    
-    HKObserverQuery *query2 =
-    [[HKObserverQuery alloc]
-     initWithSampleType:charType
-     predicate:nil
-     updateHandler:^(HKObserverQuery *query,
-                     HKObserverQueryCompletionHandler completionHandler,
-                     NSError *error) {
-         
-         
-         
-         [self getHeightQuantityResult:completionHandler];
-         
-     }];
-    [self.healthKitStore executeQuery:query2];
 }
 
 
 -(void) getQuantityResult:(HKObserverQueryCompletionHandler) completionHandler{
     
-    NSInteger limit = 0;
     
-    NSLog(@"Requesting weight data");
+    NSUInteger anchor = HKAnchoredObjectQueryNoAnchor;
+    if (self.anchorSet) {
+        anchor = self.anchor;
+    }
     
-    HKSampleQuery *query = [[HKSampleQuery alloc] initWithSampleType: [HKQuantityType quantityTypeForIdentifier:HKQuantityTypeIdentifierBodyMass]
-                                                           predicate: nil
-                                                               limit: limit
-                                                     sortDescriptors: nil
-                                                      resultsHandler:^(HKSampleQuery *query, NSArray* results, NSError *error){
-                                                          
-                                                          NSLog(@"Query completed. error=%@",error);
-                                                          
-                                                          
-                                                          NSInteger weight=0;
-                                                          
-                                                          for (HKQuantitySample *sample in results) {
-                                                              weight=[sample.quantity doubleValueForUnit:[HKUnit poundUnit]];
-                                                          }
-                                                          
-                                                          // Get the storedWeight - if it doesn't exist, create it
-                                                          NSNumber *storedWeight = [[NSUserDefaults standardUserDefaults] objectForKey:@"userWeight"];
-                                                          
-                                                          // Check to see if the retreived weight from Health app is the same as our stored weight
-                                                          if (weight != storedWeight.integerValue) {
-                                                              // We want to send the POST request with the new data and store the new weight
-                                                              NSLog(@"Sending weight data");
-                                                              [[NSUserDefaults standardUserDefaults] setObject:[NSNumber numberWithInteger:weight] forKey:@"userWeight"];
-                                                              UILocalNotification *notification=[UILocalNotification new];
-                                                              notification.fireDate=[NSDate dateWithTimeIntervalSinceNow:5];
-                                                              notification.alertBody=[NSString stringWithFormat:@"Received new weight %ld",weight];
-                                                              [[UIApplication sharedApplication] scheduleLocalNotification:notification];
-                                                          }
-                                                          
-                                                          if (completionHandler) completionHandler();
-                                                          
-                                                      }];
-    [self.healthKitStore executeQuery:query];
-}
-
--(void) getHeightQuantityResult:(HKObserverQueryCompletionHandler) completionHandler {
+    HKSampleType *sampleType =
+    [HKObjectType quantityTypeForIdentifier:HKQuantityTypeIdentifierBodyMass];
     
-    NSInteger limit = 0;
+    HKAnchoredObjectQuery *query =
+    [[HKAnchoredObjectQuery alloc]
+     initWithType:sampleType
+     predicate:nil
+     anchor:anchor
+     limit:HKObjectQueryNoLimit
+     completionHandler:^(HKAnchoredObjectQuery *query,
+                         NSArray *results,
+                         NSUInteger newAnchor,
+                         NSError *error) {
+         
+         if (error) {
+             
+             // Perform proper error handling here...
+             NSLog(@"*** An error occured while performing the anchored object query. %@ ***",
+                   error.localizedDescription);
+             
+             abort();
+         }
+         
+         NSInteger weight=0;
+         self.anchor = newAnchor;
+         self.anchorSet = YES;
+         
+         for (HKQuantitySample *sample in results) {
+             weight=[sample.quantity doubleValueForUnit:[HKUnit poundUnit]];
+         }
+         
+         if (weight > 0) {
+             NSLog(@"Sending weight data");
+             [[NSUserDefaults standardUserDefaults] setObject:[NSNumber numberWithInteger:weight] forKey:@"userWeight"];
+             UILocalNotification *notification=[UILocalNotification new];
+             notification.fireDate=[NSDate dateWithTimeIntervalSinceNow:5];
+             notification.alertBody=[NSString stringWithFormat:@"Received new weight %ld",weight];
+             [[UIApplication sharedApplication] scheduleLocalNotification:notification];
+         }
+         
+         if (completionHandler) { completionHandler(); }
+     }];
     
-    NSLog(@"Requesting height data");
     
-    HKSampleQuery *query = [[HKSampleQuery alloc] initWithSampleType: [HKQuantityType quantityTypeForIdentifier:HKQuantityTypeIdentifierHeight]
-                                                           predicate: nil
-                                                               limit: limit
-                                                     sortDescriptors: nil
-                                                      resultsHandler:^(HKSampleQuery *query, NSArray* results, NSError *error){
-                                                          
-                                                          NSLog(@"Query completed. error=%@",error);
-                                                          
-                                                          
-                                                          double heightInch=0;
-                                                          
-                                                          for (HKQuantitySample *sample in results) {
-                                                              heightInch=[sample.quantity doubleValueForUnit:[HKUnit inchUnit]];
-                                                          }
-                                                          NSLog(@"Sending height data");
-                                                          UILocalNotification *notification=[UILocalNotification new];
-                                                          notification.fireDate=[NSDate dateWithTimeIntervalSinceNow:5];
-                                                          notification.alertBody=[NSString stringWithFormat:@"Received new height: %f", heightInch];
-                                                          [[UIApplication sharedApplication] scheduleLocalNotification:notification];
-                                                          // sends the data using HTTP
-                                                          //    [self sendData: [self resultAsNumber:results]];
-                                                          if (completionHandler) completionHandler();
-                                                          
-                                                      }];
+    
     [self.healthKitStore executeQuery:query];
 }
 
