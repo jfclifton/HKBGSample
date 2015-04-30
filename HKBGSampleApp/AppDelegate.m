@@ -9,7 +9,7 @@
 #import "AppDelegate.h"
 #import <HealthKit/HealthKit.h>
 
-@interface AppDelegate ()
+@interface AppDelegate () <NSURLSessionDelegate>
 
 @property (nonatomic, strong) HKHealthStore *healthKitStore;
 @property (nonatomic, assign) BOOL anchorSet;
@@ -163,14 +163,44 @@
              notification.fireDate=[NSDate dateWithTimeIntervalSinceNow:5];
              notification.alertBody=[NSString stringWithFormat:@"Received new weight %ld",weight];
              [[UIApplication sharedApplication] scheduleLocalNotification:notification];
-         }
-         
-         if (completionHandler) { completionHandler(); }
+             [self sendWeight:weight withCompletion:^{
+                 if (completionHandler) { completionHandler(); }
+             }];
+         }         
      }];
     
     
     
     [self.healthKitStore executeQuery:query];
+}
+
+- (void)sendWeight:(NSInteger)weight withCompletion:(void (^)())completion
+{
+    NSURLSessionConfiguration *sessionConfig = [NSURLSessionConfiguration defaultSessionConfiguration];
+    [sessionConfig setHTTPAdditionalHeaders:@{@"Accept": @"application/json", @"X-Parse-Application-Id": @"t3OUGm3RM16ZWOAyToTzcNTUuWfut1MErHv1FqNq", @"X-Parse-REST-API-Key": @"Xfca91IGp72ZNoQNbvWJMomYhWyXf15UH7meWaJd"}];
+    
+    NSURLSession *session = [NSURLSession sessionWithConfiguration:sessionConfig
+                                                          delegate:nil
+                                                     delegateQueue:nil];
+    
+    NSError *jsonParamError;
+    NSString *urlStr = [NSString stringWithFormat:@"https://api.parse.com/1/classes/Weight"];
+    NSDictionary *jsonDict = [NSDictionary dictionaryWithObject:[NSNumber numberWithInteger:weight] forKey:@"weight"];
+    NSMutableURLRequest *request = [[NSMutableURLRequest alloc] initWithURL:[NSURL URLWithString:urlStr]];
+    [request setHTTPMethod:@"POST"];
+    [request setHTTPBody:[NSJSONSerialization dataWithJSONObject:jsonDict options:NSJSONWritingPrettyPrinted error:&jsonParamError]];
+    
+    NSURLSessionDataTask *weightSendTask = [session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        NSHTTPURLResponse *httpResp = (NSHTTPURLResponse*) response;
+        NSLog(@"Status: %ld", (long)httpResp.statusCode);
+        NSError *jsonError;
+        NSDictionary *responseDict = [NSJSONSerialization JSONObjectWithData:data
+                                                                     options:NSJSONReadingAllowFragments
+                                                                       error:&jsonError];
+        NSLog(@"response: %@", responseDict);
+    }];
+    
+    [weightSendTask resume];
 }
 
 @end
