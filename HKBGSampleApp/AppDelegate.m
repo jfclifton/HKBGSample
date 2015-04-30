@@ -166,7 +166,7 @@
              [self sendWeight:weight withCompletion:^{
                  if (completionHandler) { completionHandler(); }
              }];
-         }         
+         }
      }];
     
     
@@ -198,6 +198,8 @@
                                                                      options:NSJSONReadingAllowFragments
                                                                        error:&jsonError];
         NSLog(@"response: %@", responseDict);
+        
+        completion();
     }];
     
     [weightSendTask resume];
